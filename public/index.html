@@ -1,0 +1,14 @@
+<link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+<meta name="theme-color" content="#1e293b" />
+<link rel="apple-touch-icon" href="%PUBLIC_URL%/icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('%PUBLIC_URL%/service-worker.js')
+        .then((reg) => console.log('Service Worker đã đăng ký', reg.scope))
+        .catch((err) => console.error('Lỗi đăng ký Service Worker:', err));
+    });
+  }
+</script>
