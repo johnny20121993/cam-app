@@ -7,7 +7,7 @@ import {
   History, LogIn, Shield, Eye, EyeOff, Activity, ChevronDown, ChevronUp,
   FolderOpen, Grid, List, Copy, QrCode, Trash, Download, Clock,
   Menu, DatabaseBackup, DownloadCloud, UploadCloud,
-  ClipboardList, BellRing, CheckCircle2, AlertOctagon, CalendarClock, Briefcase
+  ClipboardList, BellRing, CheckCircle2, AlertOctagon, CalendarClock, Briefcase, FilePlus
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -258,7 +258,6 @@ function Input({ label, className, ...props }) {
   return (
     <div className="w-full">
       {label && <label className="block text-[14px] font-semibold mb-1 text-slate-700 dark:text-slate-300">{safeRender(label)}</label>}
-      {/* UI Tối ưu: min-h-[44px] và text-[14px] */}
       <input className={`w-full px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-shadow ${className}`} {...props} />
     </div>
   );
@@ -268,9 +267,8 @@ function Select({ label, options, className, ...props }) {
   return (
     <div className="w-full">
       {label && <label className="block text-[14px] font-semibold mb-1 text-slate-700 dark:text-slate-300">{safeRender(label)}</label>}
-      {/* UI Tối ưu: min-h-[44px] và text-[14px] */}
       <select className={`w-full px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600 outline-none focus:ring-2 focus:ring-blue-500 transition-shadow ${className}`} {...props}>
-        {options.map(o => <option key={o} value={o}>{safeRender(o)}</option>)}
+        {options.map(o => <option key={o?.value || o} value={o?.value || o}>{safeRender(o?.label || o)}</option>)}
       </select>
     </div>
   );
@@ -547,7 +545,6 @@ export default function App() {
   };
 
   return (
-    /* UI Tối ưu: text-[14px] làm gốc */
     <div className={`flex h-screen ${darkMode ? 'dark' : ''} bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-200 font-sans text-[14px]`}>
       
       {/* Overlay cho Mobile */}
@@ -555,7 +552,7 @@ export default function App() {
         <div className="fixed inset-0 bg-black/60 z-40 md:hidden backdrop-blur-sm transition-opacity" onClick={() => setIsSidebarOpen(false)}></div>
       )}
 
-      {/* TÍNH NĂNG MỚI: POPUP NHẮC NHỞ */}
+      {/* POPUP NHẮC NHỞ */}
       {showReminder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden border border-slate-200 dark:border-slate-700">
@@ -564,7 +561,6 @@ export default function App() {
                 <BellRing className="animate-bounce" size={24} />
                 <h2 className="text-lg md:text-xl font-bold">Nhắc nhở Công việc ({reminderTasks.length})</h2>
               </div>
-              {/* UI Tối ưu: Nút chạm dễ */}
               <button onClick={() => setShowReminder(false)} className="text-white/80 hover:text-white bg-white/10 hover:bg-white/20 min-h-[44px] min-w-[44px] rounded-full transition-colors flex items-center justify-center"><X size={20}/></button>
             </div>
             <div className="p-0 max-h-[60vh] overflow-y-auto custom-scrollbar">
@@ -582,7 +578,6 @@ export default function App() {
                       Đ/tượng: <span className="font-bold text-blue-600 dark:text-blue-400">{task.recordName}</span> ({task.recordCCCD})
                     </p>
                   </div>
-                  {/* UI Tối ưu: min-h-[44px] */}
                   <button 
                     onClick={() => handleCompleteTask(task.recordId, task.id)}
                     className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-emerald-500 hover:bg-emerald-600 text-white text-[14px] font-bold rounded-xl transition-colors shadow-sm w-full md:w-auto justify-center"
@@ -704,7 +699,7 @@ export default function App() {
         </main>
       </div>
 
-      {/* TÍNH NĂNG MỚI: MODAL GIAO VIỆC */}
+      {/* MODAL GIAO VIỆC */}
       {showTaskModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200 dark:border-slate-700 animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
@@ -829,34 +824,78 @@ function BackupView({ data, setData, notify }) {
     e.target.value = '';
   };
 
+  const handleMergeBackup = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const importedData = JSON.parse(evt.target.result);
+        if (Array.isArray(importedData)) {
+            let addedCount = 0;
+            const newData = [...data];
+            
+            importedData.forEach(importedItem => {
+                // Kiểm tra xem CCCD hoặc ID đã có trong DB hiện tại chưa
+                const isExist = newData.some(d => d.cccd === importedItem.cccd || d.id === importedItem.id);
+                if (!isExist) {
+                    newData.push(importedItem);
+                    addedCount++;
+                }
+            });
+
+            setData(newData);
+            notify(`Đã gộp thành công ${addedCount} hồ sơ mới từ file Backup! Các dữ liệu cũ vẫn được giữ nguyên.`, "success");
+        } else {
+           notify("File không đúng định dạng dữ liệu C.A.M.S", "error");
+        }
+      } catch(err) {
+        notify("Lỗi đọc file. Vui lòng chọn đúng file .json", "error");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = '';
+  };
+
   return (
-    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border dark:border-slate-700 p-4 md:p-10 max-w-4xl mx-auto">
+    <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-sm border dark:border-slate-700 p-4 md:p-10 max-w-6xl mx-auto">
       <div className="text-center mb-8 md:mb-10">
          <div className="w-16 h-16 md:w-20 md:h-20 bg-blue-100 dark:bg-blue-900/50 rounded-full flex items-center justify-center mx-auto mb-4 text-blue-600 dark:text-blue-400">
             <DatabaseBackup size={32} className="md:w-10 md:h-10" />
          </div>
          <h2 className="text-xl md:text-3xl font-bold mb-3">Sao Lưu & Phục Hồi Dữ Liệu</h2>
-         <p className="text-[14px] text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">Công cụ này giúp bạn trích xuất toàn bộ dữ liệu hiện có thành một file gốc (Backup). Bạn có thể dùng file này để cất giữ an toàn hoặc chuyển sang máy khác.</p>
+         <p className="text-[14px] text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">Công cụ này giúp bạn trích xuất dữ liệu, phục hồi nguyên trạng, hoặc gộp thêm dữ liệu từ máy khác mang sang.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
          <div className="bg-emerald-50 dark:bg-emerald-900/10 p-6 md:p-8 rounded-3xl border border-emerald-200 dark:border-emerald-800/50 flex flex-col items-center text-center">
             <DownloadCloud size={48} className="text-emerald-500 mb-4" />
-            <h3 className="text-lg md:text-xl font-bold text-emerald-800 dark:text-emerald-400 mb-2">Trích xuất dữ liệu</h3>
-            <p className="text-[14px] text-emerald-600 dark:text-emerald-500 mb-6 flex-1">Tải xuống toàn bộ hồ sơ (bao gồm cả ảnh, lịch sử, ghi chú) dưới dạng file .json.</p>
+            <h3 className="text-lg md:text-xl font-bold text-emerald-800 dark:text-emerald-400 mb-2">1. Trích xuất</h3>
+            <p className="text-[14px] text-emerald-600 dark:text-emerald-500 mb-6 flex-1">Tải xuống toàn bộ hồ sơ hiện có dưới dạng file .json.</p>
             <button onClick={handleExportBackup} className="w-full py-3 md:py-4 min-h-[44px] bg-emerald-600 text-white font-bold rounded-xl hover:bg-emerald-700 shadow-lg shadow-emerald-600/30 transition-all flex justify-center items-center gap-2">
-               <DownloadCloud size={20} /> Tạo file Backup ngay
+               <DownloadCloud size={20} /> Tạo Backup
             </button>
-            <p className="text-[13px] text-slate-400 mt-4">Hệ thống đang lưu trữ: {data.length} bản ghi.</p>
+            <p className="text-[13px] text-slate-400 mt-4">Hệ thống đang lưu: {data.length} bản ghi.</p>
+         </div>
+
+         <div className="bg-blue-50 dark:bg-blue-900/10 p-6 md:p-8 rounded-3xl border border-blue-200 dark:border-blue-800/50 flex flex-col items-center text-center relative overflow-hidden">
+            <FilePlus size={48} className="text-blue-500 mb-4" />
+            <h3 className="text-lg md:text-xl font-bold text-blue-800 dark:text-blue-400 mb-2">2. Gộp Cập Nhật</h3>
+            <p className="text-[14px] text-blue-600 dark:text-blue-500 mb-6 flex-1">Nạp file Backup để <strong>bổ sung</strong> các hồ sơ mới (chưa có trên máy). <strong>Không làm mất dữ liệu cũ.</strong></p>
+            
+            <label className="w-full py-3 md:py-4 min-h-[44px] bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-600/30 transition-all flex justify-center items-center gap-2 cursor-pointer z-10">
+               <UploadCloud size={20} /> Chọn file Gộp
+               <input type="file" accept=".json" className="hidden" onChange={handleMergeBackup} />
+            </label>
          </div>
 
          <div className="bg-orange-50 dark:bg-orange-900/10 p-6 md:p-8 rounded-3xl border border-orange-200 dark:border-orange-800/50 flex flex-col items-center text-center relative overflow-hidden">
             <UploadCloud size={48} className="text-orange-500 mb-4" />
-            <h3 className="text-lg md:text-xl font-bold text-orange-800 dark:text-orange-400 mb-2">Phục hồi dữ liệu</h3>
-            <p className="text-[14px] text-orange-600 dark:text-orange-500 mb-6 flex-1">Nạp file Backup (.json) vào máy. <strong className="text-red-500">Dữ liệu cũ trên máy sẽ bị ghi đè.</strong></p>
+            <h3 className="text-lg md:text-xl font-bold text-orange-800 dark:text-orange-400 mb-2">3. Khôi phục (Ghi đè)</h3>
+            <p className="text-[14px] text-orange-600 dark:text-orange-500 mb-6 flex-1">Nạp file Backup vào máy. <strong className="text-red-500">Dữ liệu hiện tại trên máy sẽ bị XÓA SẠCH.</strong></p>
             
             <label className="w-full py-3 md:py-4 min-h-[44px] bg-orange-600 text-white font-bold rounded-xl hover:bg-orange-700 shadow-lg shadow-orange-600/30 transition-all flex justify-center items-center gap-2 cursor-pointer z-10">
-               <UploadCloud size={20} /> Chọn file Backup
+               <AlertTriangle size={20} /> Chọn file Ghi đè
                <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
             </label>
          </div>
@@ -949,7 +988,6 @@ function DashboardView({ data }) {
 
   return (
     <div className="space-y-6 md:space-y-8 animate-fade-in">
-      {/* UI Tối ưu: Grid 1 cột trên điện thoại */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <StatCard label="Tổng Hồ Sơ" value={tongSo} color="blue" Icon={Users} />
         <StatCard label="Đang Quản Lý (duy nhất)" value={dangQuanLy} color="emerald" Icon={CheckSquare} />
@@ -958,7 +996,6 @@ function DashboardView({ data }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
         <AlertBox title="Lỗi Logic (Đã chết)" count={ghostRecords.length} color="red" onExport={() => exportTableToExcel('tbl-ghost', 'Loi_Trang_Thai_Chet')}>
-          {/* Bọc table cho cuộn ngang */}
           <div className="w-full overflow-x-auto">
             <table id="tbl-ghost" className="w-full text-[14px] text-left whitespace-nowrap min-w-[300px]">
               <thead className="bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200 sticky top-0">
@@ -1113,7 +1150,6 @@ function TrashView({ data, setData, notify }) {
        {trashData.length === 0 ? (
          <div className="text-center py-20 text-slate-400"><Trash size={48} className="mx-auto mb-4 opacity-50"/> Thùng rác trống</div>
        ) : (
-         /* Bọc overflow-x-auto cho bảng thùng rác */
          <div className="w-full overflow-x-auto border dark:border-slate-700 rounded-xl">
            <table className="w-full text-[14px] text-left whitespace-nowrap min-w-[600px]">
              <thead className="bg-slate-50 dark:bg-slate-700 uppercase text-[13px]">
@@ -1418,7 +1454,7 @@ function FormView({ data, setData, editingRecord, setActiveTab, notify, cskvMapp
               </div>
               {formData.avatar && <button onClick={() => setFormData({...formData, avatar: null})} className="text-[13px] min-h-[40px] px-3 text-red-500 font-bold hover:underline">Xóa ảnh</button>}
             </div>
-            {/* UI Tối ưu: Grid linh hoạt */}
+            
             <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input label="Họ và tên *" name="hoTen" value={formData.hoTen} onChange={handleChange} />
               <Input label="Số CCCD *" name="cccd" value={formData.cccd} onChange={handleChange} onBlur={handleCCCDBlur} />
@@ -1539,7 +1575,7 @@ function FormView({ data, setData, editingRecord, setActiveTab, notify, cskvMapp
                 {anEditingIndex !== null && <button onClick={() => { setCurrentAn({ toiDanh: '', hinhThucChinh: '', hinhThucPhu: [], ngayBatDau: '', ngayKetThuc: '', thoiHanNam: '', thoiHanThang: '' }); setAnEditingIndex(null); }} className="px-4 py-2 min-h-[44px] border rounded-lg dark:border-slate-600">Hủy</button>}
               </div>
             </div>
-            {/* Bọc bảng Form */}
+            
             <div className="overflow-x-auto border dark:border-slate-700 rounded-lg mt-4 w-full">
               <table className="w-full text-[14px] whitespace-nowrap min-w-[700px]">
                 <thead className="bg-slate-50 dark:bg-slate-700"><tr><th className="p-3 text-left">Tội danh</th><th className="p-3 text-left min-w-[120px]">Xử lý chính</th><th className="p-3 text-left">Phụ</th><th className="p-3 text-left min-w-[90px]">Ngày BĐ</th><th className="p-3 text-left min-w-[90px]">Ngày KT</th><th className="p-3 text-left min-w-[100px]">Thời hạn</th><th className="p-3 text-center min-w-[100px]">Thao tác</th></tr></thead>
@@ -1709,17 +1745,39 @@ function ListView({ data, setData, allData, notify, openForm, cskvMapping, searc
   const [deleteInput, setDeleteInput] = useState('');
   const [qrModal, setQrModal] = useState(null);
 
+  const uniqueDiens = useMemo(() => {
+    const set = new Set();
+    data.forEach(d => d.danhSachDien?.forEach(x => set.add(typeof x === 'string' ? x : x.ten)));
+    return Array.from(set).filter(Boolean);
+  }, [data]);
+
+  const uniqueToiDanh = useMemo(() => {
+    const set = new Set();
+    data.forEach(d => d.tienAnTienSu?.forEach(x => { if (x.toiDanh) set.add(x.toiDanh) }));
+    return Array.from(set).filter(Boolean);
+  }, [data]);
+
+  const uniqueHinhThuc = useMemo(() => {
+    const set = new Set();
+    data.forEach(d => d.tienAnTienSu?.forEach(x => {
+        if (x.hinhThucChinh) set.add(x.hinhThucChinh);
+        if (x.hinhThucPhu) x.hinhThucPhu.forEach(h => set.add(h));
+    }));
+    return Array.from(set).filter(Boolean);
+  }, [data]);
+
+
   const filteredData = useMemo(() => {
     return data.filter(item => {
       const matchSearch = !searchTerm || item.hoTen?.toLowerCase().includes(searchTerm.toLowerCase()) || item.cccd?.includes(searchTerm);
       const matchKhuPho = filters.khuPho === 'All' || item.khuPho === filters.khuPho;
       
-      const matchDien = !filters.dien || item.danhSachDien?.some(d => {
+      const matchDien = !filters.dien || filters.dien === 'All' || item.danhSachDien?.some(d => {
          const ten = typeof d === 'string' ? d : d.ten;
          return ten?.toLowerCase().includes(filters.dien.toLowerCase());
       });
-      const matchToiDanh = !filters.toiDanh || item.tienAnTienSu?.some(an => an.toiDanh?.toLowerCase().includes(filters.toiDanh.toLowerCase()));
-      const matchHinhThuc = !filters.hinhThucXuLy || item.tienAnTienSu?.some(an => an.hinhThucChinh?.toLowerCase().includes(filters.hinhThucXuLy.toLowerCase()) || an.hinhThucPhu?.some(h => h.toLowerCase().includes(filters.hinhThucXuLy.toLowerCase())));
+      const matchToiDanh = !filters.toiDanh || filters.toiDanh === 'All' || item.tienAnTienSu?.some(an => an.toiDanh?.toLowerCase().includes(filters.toiDanh.toLowerCase()));
+      const matchHinhThuc = !filters.hinhThucXuLy || filters.hinhThucXuLy === 'All' || item.tienAnTienSu?.some(an => an.hinhThucChinh?.toLowerCase().includes(filters.hinhThucXuLy.toLowerCase()) || an.hinhThucPhu?.some(h => h.toLowerCase().includes(filters.hinhThucXuLy.toLowerCase())));
       const matchGioiTinh = filters.gioiTinh === 'All' || item.gioiTinh === filters.gioiTinh;
       
       let matchNgaySinh = true;
@@ -1745,7 +1803,7 @@ function ListView({ data, setData, allData, notify, openForm, cskvMapping, searc
       const diens = item.danhSachDien?.length ? item.danhSachDien : [{ ten: '(Không có diện)', trangThai: item.trangThaiQL }];
       
       const matchedDiens = diens.filter(dienObj => {
-          if (!filters.dien) return true;
+          if (!filters.dien || filters.dien === 'All') return true;
           const ten = typeof dienObj === 'string' ? dienObj : dienObj.ten;
           return ten?.toLowerCase().includes(filters.dien.toLowerCase());
       });
@@ -1874,9 +1932,22 @@ function ListView({ data, setData, allData, notify, openForm, cskvMapping, searc
             <option className="text-green-600 font-bold" value="Đang quản lý">Chỉ Lọc Đang quản lý</option>
             <option className="text-gray-500 font-bold" value="Đã kết thúc">Chỉ Lọc Đã kết thúc</option>
           </select>
-          <input placeholder="Lọc diện..." className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.dien} onChange={e => setFilters({...filters, dien: e.target.value})} />
-          <input placeholder="Lọc tội danh..." className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.toiDanh} onChange={e => setFilters({...filters, toiDanh: e.target.value})} />
-          <input placeholder="Lọc hình thức xử lý..." className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.hinhThucXuLy} onChange={e => setFilters({...filters, hinhThucXuLy: e.target.value})} />
+          
+          <select className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.dien} onChange={e => setFilters({...filters, dien: e.target.value})}>
+             <option value="All">Tất cả Diện quản lý</option>
+             {uniqueDiens.map(d => <option key={d} value={d}>{safeRender(d)}</option>)}
+          </select>
+          
+          <select className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.toiDanh} onChange={e => setFilters({...filters, toiDanh: e.target.value})}>
+             <option value="All">Tất cả Tội danh</option>
+             {uniqueToiDanh.map(t => <option key={t} value={t}>{safeRender(t)}</option>)}
+          </select>
+          
+          <select className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.hinhThucXuLy} onChange={e => setFilters({...filters, hinhThucXuLy: e.target.value})}>
+             <option value="All">Tất cả Hình thức xử lý</option>
+             {uniqueHinhThuc.map(h => <option key={h} value={h}>{safeRender(h)}</option>)}
+          </select>
+          
           <select className="px-3 py-2 min-h-[44px] text-[14px] border rounded-lg dark:bg-slate-700 dark:border-slate-600" value={filters.gioiTinh} onChange={e => setFilters({...filters, gioiTinh: e.target.value})}>
             <option value="All">Giới tính</option><option>Nam</option><option>Nữ</option>
           </select>
@@ -2500,8 +2571,10 @@ function CompareView({ data, setData, notify }) {
     if (matched.length === 0) return { dienList: '', status: '' };
     const mappedMatched = matched.map(d => typeof d === 'string' ? d : d.ten);
     
-    const matchedDienObj = matched[0];
-    const status = typeof matchedDienObj === 'string' ? record.trangThaiQL : matchedDienObj.trangThai;
+    // Yêu cầu: Nếu có nhiều diện trùng loại (vd 2 cái methadone), 
+    // nếu có ít nhất 1 cái "Đang quản lý" thì ưu tiên lấy "Đang quản lý".
+    const hasActive = matched.some(d => (typeof d === 'string' ? record.trangThaiQL : d.trangThai) === 'Đang quản lý');
+    const status = hasActive ? 'Đang quản lý' : 'Đã kết thúc';
     
     return { dienList: mappedMatched.join('; '), status };
   };
@@ -2511,6 +2584,7 @@ function CompareView({ data, setData, notify }) {
     const cccdArrayRaw = inputText.split('\n').map(s => formatCCCD(s)).filter(s => s.length === 12);
     const cccdArray = [...new Set(cccdArrayRaw)];
     
+    // Lấy tất cả hồ sơ đang active trên hệ thống CÓ CHỨA diện yêu cầu.
     const activeInDbRecords = data.filter(d => !d.deletedAt && d.danhSachDien?.some(dienObj => {
            const ten = typeof dienObj === 'string' ? dienObj : dienObj.ten;
            const tt = typeof dienObj === 'string' ? d.trangThaiQL : dienObj.trangThai;
@@ -2520,6 +2594,7 @@ function CompareView({ data, setData, notify }) {
     
     setDbMatchCount(activeInDbRecords.length);
 
+    // Tìm những người CÓ trên PM (đang quản lý diện đó) nhưng bị THIẾU trong danh sách CCCD dán vào.
     const missing = activeInDbRecords.filter(dbRecord => !cccdArray.includes(String(dbRecord.cccd).trim()));
     setMissingFromPasted(missing);
 
@@ -2549,6 +2624,7 @@ function CompareView({ data, setData, notify }) {
             finalStatus = 'Hợp lệ';
             isHopLe = true;
          } else {
+            // Yêu cầu: Diện tìm thấy nhưng chỉ có "Đã kết thúc" -> Báo lệch (không hợp lệ)
             finalStatus = 'Diện đã kết thúc';
          }
       }
@@ -2648,7 +2724,7 @@ function CompareView({ data, setData, notify }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8 flex-1 overflow-hidden min-h-0">
           <div className="lg:col-span-1 flex flex-col h-full space-y-4 min-h-0">
             <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl text-[14px] border border-emerald-100 dark:border-emerald-800 shrink-0 hidden md:block">
-              <strong>HƯỚNG DẪN:</strong> Dán hàng trăm CCCD, chọn diện yêu cầu. Công cụ sẽ xuất báo cáo đối tượng nào Hợp lệ và đối tượng Lỗi.
+              <strong>HƯỚNG DẪN:</strong> Dán hàng trăm CCCD, chọn diện yêu cầu. Công cụ sẽ xuất báo cáo đối tượng nào Hợp lệ và đối tượng Lỗi (Bao gồm báo Lệch Số nếu bị thiếu).
             </div>
             <div className="flex flex-col shrink-0">
               <label className="font-bold mb-2 text-[14px] md:text-[15px]">Chọn diện yêu cầu:</label>
@@ -2849,7 +2925,7 @@ function BulkImageImportView({ data, setData, notify }) {
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [importing, setImporting] = useState(false);
 
-  const handleFolderSelect = (e) => {
+  const handleFileSelect = (e) => {
     const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/'));
     setSelectedFiles(files);
   };
@@ -2893,12 +2969,26 @@ function BulkImageImportView({ data, setData, notify }) {
              Chọn tải lên tất cả ảnh cùng lúc, hệ thống sẽ tự động quét số thẻ và gán ảnh vào đúng hồ sơ tương ứng.
           </p>
         </div>
-        <label className="border-2 border-dashed border-purple-300 dark:border-purple-600 rounded-2xl p-10 md:p-16 flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 dark:hover:bg-slate-700/50 transition-colors bg-slate-50 dark:bg-slate-800/50">
-          <ImageIcon size={64} className="text-purple-400 mb-6 drop-shadow-md" />
-          <span className="text-lg md:text-xl font-bold text-slate-700 dark:text-slate-300 text-center mb-2">Nhấn vào đây để chọn ảnh</span>
-          <span className="text-[14px] text-slate-500 text-center">(Hỗ trợ bôi đen quét nhiều ảnh hoặc ấn Ctrl+A)</span>
-          <input type="file" id="folder-input" multiple accept="image/*" onChange={handleFolderSelect} className="hidden" />
-        </label>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+           {/* Nút dành cho Desktop/PC */}
+           <label className="border-2 border-dashed border-purple-300 dark:border-purple-600 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-purple-50 dark:hover:bg-slate-700/50 transition-colors bg-slate-50 dark:bg-slate-800/50">
+             <ImageIcon size={48} className="text-purple-400 mb-4 drop-shadow-md" />
+             <span className="text-lg font-bold text-slate-700 dark:text-slate-300 text-center mb-1">Chọn trên Máy tính</span>
+             <span className="text-[13px] text-slate-500 text-center">(Hỗ trợ bôi đen quét nhiều ảnh)</span>
+             <input type="file" multiple accept="image/*" onChange={handleFileSelect} className="hidden" />
+           </label>
+
+           {/* Nút dành riêng cho Mobile/Điện thoại */}
+           <label className="border-2 border-solid border-indigo-300 dark:border-indigo-600 rounded-2xl p-8 flex flex-col items-center justify-center cursor-pointer hover:bg-indigo-50 dark:hover:bg-slate-700/50 transition-colors bg-indigo-50/50 dark:bg-slate-800/50">
+             <Camera size={48} className="text-indigo-400 mb-4 drop-shadow-md" />
+             <span className="text-lg font-bold text-slate-700 dark:text-slate-300 text-center mb-1">Chọn trên Điện thoại</span>
+             <span className="text-[13px] text-slate-500 text-center">(Mở thư viện ảnh điện thoại)</span>
+             {/* Note: Sử dụng capture="environment" hoặc bỏ trống để gọi native picker trên mobile */}
+             <input type="file" multiple accept="image/*" onChange={handleFileSelect} className="hidden" />
+           </label>
+        </div>
+
         {selectedFiles.length > 0 && (
           <div className="flex flex-col sm:flex-row items-center justify-between bg-slate-100 dark:bg-slate-700 p-4 rounded-xl gap-4">
             <p className="font-bold text-[16px] text-slate-700 dark:text-slate-200">Đã chọn: <span className="text-blue-600 dark:text-blue-400">{safeRender(selectedFiles.length)}</span> ảnh</p>
@@ -3112,22 +3202,22 @@ function ReportView({ data, handleCompleteTask }) {
                {sortedKp.length === 0 ? <p className="text-slate-400 italic text-center py-10">Chưa có dữ liệu</p> :
                  sortedKp.map(([kp, count], idx) => (
                    <li key={kp} className="group">
-                     <div className="flex justify-between text-[15px] mb-2 font-bold">
+                     <div className="flex justify-between text-base mb-2 font-bold">
                        <span className="text-slate-700 dark:text-slate-200 group-hover:text-blue-600 transition-colors">{idx+1}. {safeRender(kp)}</span>
-                       <span className={idx < 3 ? 'text-red-600 text-[16px] drop-shadow-sm' : 'text-blue-600'}>{count} hồ sơ</span>
+                       <span className={idx < 3 ? 'text-red-600 text-lg drop-shadow-sm' : 'text-blue-600'}>{count} hồ sơ</span>
                      </div>
                      <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-4 overflow-hidden shadow-inner">
                        <div className={`h-full rounded-full transition-all duration-1000 ease-out relative ${idx < 3 ? 'bg-gradient-to-r from-red-500 to-red-400' : 'bg-gradient-to-r from-blue-600 to-blue-400'}`} style={{width: `${Math.min((count/sortedKp[0][1])*100, 100)}%`}}>
-                          <div className="absolute inset-0 bg-white/20 w-full h-full transform -skew-x-12 translate-x-full group-hover:-translate-x-full transition-transform duration-1000"></div>
+                          <div className="absolute inset-0 bg-white/20 w-full animate-pulse"></div>
                        </div>
                      </div>
                    </li>
                  ))
                }
              </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+           </div>
+         </div>
+       </div>
+     </div>
+   );
 }
